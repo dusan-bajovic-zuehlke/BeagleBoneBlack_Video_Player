@@ -9,3 +9,18 @@ Also to enasure possibility of video content changing an custom API is defined. 
 ## Usage
 
 Test bench for real time camera testing.
+
+# Working Agreement
+
+## Project organization
+
+Length, sprint devision
+
+## Meeting organization
+
+Dailys, Retros, Plannings
+
+## Work organization
+
+Feature branching, PR, PR reviewing, Commit messages, Work Item moving
+

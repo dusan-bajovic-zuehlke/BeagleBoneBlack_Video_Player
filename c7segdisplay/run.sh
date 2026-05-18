@@ -1,0 +1,1 @@
+sudo bash -c 'sudo ./main_lr --left video.mp4 & sudo ./seg7 --right'

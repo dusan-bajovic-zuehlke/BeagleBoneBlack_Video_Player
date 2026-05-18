@@ -1,0 +1,13 @@
+alpine-base
+alpine-baselayout
+alpine-keys
+alpine-release
+apk-tools
+busybox
+chrony
+file
+mdev-conf
+musl-utils
+openrc
+openssh
+xrandr

@@ -18,48 +18,32 @@ if [[ ! -b "$DEVICE" ]]; then
     exit 1
 fi
 
-echo "Device: $DEVICE"
-lsblk "$DEVICE"
-read -rp "Are you sure you want to write to $DEVICE? (yes/no): " CONFIRM
-if [[ "$CONFIRM" != "yes" ]]; then
-    echo "Aborted."
-    exit 0
-fi
-
 # ─── Unmount any existing mounts ──────────────────────────────────────────────
-echo ">> Unmounting any existing mounts..."
+echo -e "\e[34m[INFO]\e[0m Unmounting any existing mounts..."
 umount "${DEVICE}"* 2>/dev/null || true
 
-# ─── Extract boot files to temp dir ───────────────────────────────────────────
-echo ">> Extracting boot files..."
-WORKDIR=$(mktemp -d)
-tar xf boot-files.tar.gz --strip-components=1 -C "$WORKDIR"
-
-# ─── Write MLO and U-Boot raw ─────────────────────────────────────────────────
-echo ">> Writing MLO and U-Boot raw..."
-dd if="$WORKDIR/MLO" of="$DEVICE" bs=512 seek=256 conv=notrunc
-dd if="$WORKDIR/u-boot.img" of="$DEVICE" bs=512 seek=768 conv=notrunc
+# ─── Write MLO and U-Boot as raw bytes ────────────────────────────────────────
+echo -e "\e[34m[INFO]\e[0m Writing MLO and U-Boot raw..."
+dd if=boot-files/MLO of="$DEVICE" bs=512 seek=256 conv=notrunc
+dd if=boot-files/u-boot.img of="$DEVICE" bs=512 seek=768 conv=notrunc
 sync
 
-# ─── Mount FAT32 and copy boot files ──────────────────────────────────────────
-echo ">> Mounting FAT32 partition and copying boot files..."
-mount "${DEVICE}1" /mnt
-cp "$WORKDIR"/* /mnt/
+# ─── Copy boot files to SD card ───────────────────────────────────────────────
+echo -e "\e[34m[INFO]\e[0m Copying boot files to FAT32 partition..."
+mkfs.fat -F 32 "${DEVICE}1"
+mount "${DEVICE}1" /mnt 
+sudo cp -r boot-files/* /mnt/
 umount /mnt
 sync
 
-rm -rf "$WORKDIR"
-
-# ─── Mount ext4 and copy Alpine filesystem ────────────────────────────────────
-echo ">> Mounting ext4 partition and copying Alpine filesystem..."
-WORKDIR=$(mktemp -d)
-tar xf alpine-fs.tar.gz --strip-components=1 -C "$WORKDIR"
-mount "${DEVICE}2" /mnt
-cp -r "$WORKDIR"/* /mnt/
+# ─── Copy Alpine filesystem to SD card ────────────────────────────────────────
+echo -e "\e[34m[INFO]\e[0m Copying Alpine filesystem files to ext4 partition..."
+mkfs.ext4 "${DEVICE}2"
+mount "${DEVICE}2" /mnt 
+sudo cp -r alpine-fs/* /mnt/
 umount /mnt
 sync
 
-rm -rf "$WORKDIR"
+echo -e "\e[34m[INFO]\e[0m \e[32mDone! Insert SD card into BeagleBone Black and hold S2 while powering on.\e[0m"
 
-echo ""
-echo "✓ Done! Insert SD card into BeagleBone Black and hold S2 while powering on."
+

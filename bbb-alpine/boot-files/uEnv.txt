@@ -1,0 +1,1 @@
+uenvcmd=load mmc 0:1 ${loadaddr} vmlinuz-6.18.23-bone28; load mmc 0:1 ${fdtaddr} am335x-boneblack.dtb; setenv bootargs console=ttyS0,115200n8 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait rw; bootz ${loadaddr} - ${fdtaddr}

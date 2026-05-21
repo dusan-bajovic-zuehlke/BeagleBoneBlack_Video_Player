@@ -196,10 +196,16 @@ static void draw_digit(const FB *fb,
     }
 }
 
+static void restore_cursor(void) {
+    fprintf(stdout, "\033[?25h");
+    fflush(stdout);
+}
+
 /* -- Main ------------------------------------------------------------------- */
 
 int main(int argc, char *argv[])
 {
+    atexit(restore_cursor);
     typedef enum { FULL, LEFT, RIGHT } Side;
     Side side = FULL;
     for (int i = 1; i < argc; i++) {
@@ -253,7 +259,7 @@ int main(int argc, char *argv[])
 
     uint32_t COLOR_BG  = 0x00000000;
     uint32_t COLOR_ON  = 0x00FFFFFF;
-    uint32_t COLOR_OFF = 0x00111111;
+    uint32_t COLOR_OFF = 0x00000000;
     uint32_t COLOR_SEP = 0x00FFFFFF;
 
     while (!g_quit) {

@@ -17,7 +17,9 @@
  * Run side by side with seg7:
  *   sudo bash -c './mp4player --left video.mp4 & ./seg7 --right'
  *
- * Build: see build.sh
+ * Build:
+ *   gcc mp4player.c -o mp4player -O3 -march=native -funroll-loops -ffast-math \
+ *     -pthread $(pkg-config --cflags --libs libavformat libavcodec libavutil libswscale)
  */
 
 #include <stdio.h>
@@ -178,8 +180,14 @@ static void fb_blit(const FB *fb, const uint8_t *src, int src_stride)
 
 /* -- Main ------------------------------------------------------------------ */
 
+static void restore_cursor(void) {
+    fprintf(stdout, "\033[?25h");
+    fflush(stdout);
+}
+
 int main(int argc, char *argv[])
 {
+    atexit(restore_cursor);
     const char *fbdev    = "/dev/fb0";
     const char *filename = NULL;
 
@@ -287,44 +295,66 @@ int main(int argc, char *argv[])
         AVPacket *pkt = av_packet_alloc();
         if (!pkt) die_msg("av_packet_alloc");
 
-        int64_t t_start_us = av_gettime_relative();
+        /* Hide terminal cursor */
+        fprintf(stdout, "\033[?25l");
+        fflush(stdout);
 
-        while (!g_quit && av_read_frame(fmt_ctx, pkt) >= 0) {
-            if (pkt->stream_index != video_idx) {
-                av_packet_unref(pkt);
-                continue;
-            }
+        /* Black out the entire framebuffer before starting */
+        memset(fb.mem, 0, fb.mem_size);
 
-            ret = avcodec_send_packet(codec_ctx, pkt);
-            av_packet_unref(pkt);
-            if (ret < 0) continue;
+        /* -- 6. Outer loop: restart from beginning when video ends --------- */
+        while (!g_quit) {
+            int64_t t_start_us = av_gettime_relative();
 
-            while (!g_quit && ret >= 0) {
-                ret = avcodec_receive_frame(codec_ctx, frame);
-                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
-                if (ret < 0) { fprintf(stderr, "avcodec_receive_frame error\n"); break; }
-
-                sws_scale(sws_ctx,
-                          (const uint8_t * const *)frame->data, frame->linesize,
-                          0, src_h,
-                          frame_dst->data, frame_dst->linesize);
-
-                fb_blit(&fb, frame_dst->data[0], frame_dst->linesize[0]);
-
-                if (frame->pts != AV_NOPTS_VALUE) {
-                    int64_t pts_us = av_rescale_q(frame->pts, vstream->time_base, AV_TIME_BASE_Q);
-                    int64_t now_us = av_gettime_relative() - t_start_us;
-                    int64_t diff   = pts_us - now_us;
-                    if (diff > 1000) usleep((useconds_t)diff);
-                } else {
-                    sleep_ms(frame_delay_ms);
+            while (!g_quit && av_read_frame(fmt_ctx, pkt) >= 0) {
+                if (pkt->stream_index != video_idx) {
+                    av_packet_unref(pkt);
+                    continue;
                 }
-            }
-        }
 
-        /* Flush decoder */
-        avcodec_send_packet(codec_ctx, NULL);
-        while (avcodec_receive_frame(codec_ctx, frame) >= 0) {}
+                ret = avcodec_send_packet(codec_ctx, pkt);
+                av_packet_unref(pkt);
+                if (ret < 0) continue;
+
+                while (!g_quit && ret >= 0) {
+                    ret = avcodec_receive_frame(codec_ctx, frame);
+                    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+                    if (ret < 0) { fprintf(stderr, "avcodec_receive_frame error\n"); break; }
+
+                    sws_scale(sws_ctx,
+                            (const uint8_t * const *)frame->data, frame->linesize,
+                            0, src_h,
+                            frame_dst->data, frame_dst->linesize);
+
+                    memset(fb.mem, 0, fb.off_y * fb.line_len);
+
+                    memset(fb.mem + (fb.off_y + fb.vid_h) * fb.line_len, 0, (fb.fb_h - fb.off_y - fb.vid_h) * fb.line_len);
+
+                    fb_blit(&fb, frame_dst->data[0], frame_dst->linesize[0]);
+
+                    if (frame->pts != AV_NOPTS_VALUE) {
+                        int64_t pts_us = av_rescale_q(frame->pts, vstream->time_base, AV_TIME_BASE_Q);
+                        int64_t now_us = av_gettime_relative() - t_start_us;
+                        int64_t diff   = pts_us - now_us;
+                        if (diff > 1000) usleep((useconds_t)diff);
+                    } else {
+                        sleep_ms(frame_delay_ms);
+                    }
+                }
+            } 
+
+            /* Flush decoder */
+            avcodec_send_packet(codec_ctx, NULL);
+            while (avcodec_receive_frame(codec_ctx, frame) >= 0) {}
+
+            /* Seek back to start for next iteration */
+            avcodec_flush_buffers(codec_ctx);
+            av_seek_frame(fmt_ctx, video_idx, 0, AVSEEK_FLAG_BACKWARD);
+        }        
+
+        /* Restore cursor on exit */
+        fprintf(stdout, "\033[?25h");
+        fflush(stdout);
 
         /* Clear our region on exit */
         uint32_t bytes_pp = fb.bpp / 8;

@@ -11,8 +11,9 @@ echo "1.."
 sleep 1
 
 if ! pgrep -x mp4player > /dev/null; then
+	SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 	trap 'kill $P1 $P2' INT TERM
-	./mp4player --right ./video.mp4 & P1=$!
-	./seg7 --left & P2=$!
+	$SCRIPT_DIR/mp4player --right $SCRIPT_DIR/video.mp4 & P1=$!
+	$SCRIPT_DIR/seg7 --left & P2=$!
 	wait
 fi

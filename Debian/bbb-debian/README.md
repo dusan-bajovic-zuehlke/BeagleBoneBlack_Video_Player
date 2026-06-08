@@ -1,6 +1,6 @@
-# #31 Create directory with files for Debian and script to load these files to SD card
+# Create directory with files for Debian and script to load these files to SD card
 
-This directory contains a script that automatically downloads the official Debian image for BeagleBone Black and flashes it to an SD card.
+This directory contains a script that automatically downloads the official Debian image for BeagleBone Black, flashes it to an SD card and strips it on BeagleBone Black.
 
 ---
 
@@ -9,25 +9,26 @@ This directory contains a script that automatically downloads the official Debia
 ```
 bbb-debian/
 ├── flash.sh     ← flashing script
+├── strip.sh     ← Debian striping script
 └── README.md    ← this file
 ```
 
 
 ## Usage
 
-### 1. Make the script executable
+### 1. Make the flashing script executable
 ```bash
 chmod +x flash.sh
 ```
 
-### 2. Run the script as root
+### 2. Run the flashing script as root
 ```bash
 sudo ./flash.sh
 ```
 
 ### 3. Follow the prompts
 
-The script will:
+The flashing script will:
 - Download the Debian 12.13 (Bookworm) image 
 - Verify the SHA256 checksum
 - Show all connected storage devices
@@ -62,10 +63,27 @@ The script will:
 
 ---
 
-## Connecting via SSH
+### 4. Copy striping script to Debian on BeagleBone Black
+
+```bash
+scp strip.sh debian@192.168.7.2:~
+```
+
+
+### 5. Connecting via SSH
 
 ```bash
 ssh debian@192.168.7.2
+```
+
+### 6. Make the striping script executable
+```bash
+chmod +x strip.sh
+```
+
+### 7. Run the striping script as root
+```bash
+sudo ./strip.sh
 ```
 
 
